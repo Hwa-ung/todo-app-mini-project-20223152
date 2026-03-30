@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
 // 백엔드 API 주소 (로컬 개발용)
-const API_BASE = "http://localhost:5000/api/todos";
+const API_BASE = "https://to-do-list-beta-ruby-82.vercel.app/api/todos";
 
 const api = {
   async getAll() {
@@ -87,7 +87,7 @@ export default function App() {
         setTodos(data);
         setLoading(false);
       })
-      .catch((err) => {
+      .catch((_err) => {
         setError("서버 연결 실패 — 백엔드가 실행 중인지 확인하세요");
         setLoading(false);
       });
@@ -101,7 +101,7 @@ export default function App() {
       setTodos((prev) => [newTodo, ...prev]);
       setInput("");
       inputRef.current?.focus();
-    } catch (err) {
+    } catch (_err) {
       setError("추가 실패");
     }
   };
@@ -110,7 +110,7 @@ export default function App() {
     try {
       const updated = await api.toggle(id, !currentCompleted);
       setTodos((prev) => prev.map((t) => (t._id === id ? updated : t)));
-    } catch (err) {
+    } catch (_err) {
       setError("업데이트 실패");
     }
   };
