@@ -8,8 +8,8 @@ const api = {
     const res = await axios.get(API_BASE);
     return res.data;
   },
-  async create(title) {
-    const res = await axios.post(API_BASE, { title });
+  async create(title, dueDate) {
+    const res = await axios.post(API_BASE, { title, dueDate: dueDate || null });
     return res.data;
   },
   async toggle(id, completed) {
@@ -38,8 +38,8 @@ const PlusIcon = () => (
 
 const TrashIcon = () => (
   <svg
-    width="15"
-    height="15"
+    width="14"
+    height="14"
     viewBox="0 0 16 16"
     fill="none"
     stroke="currentColor"
@@ -66,21 +66,68 @@ const CheckIcon = () => (
   </svg>
 );
 
+const CalendarIcon = () => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 16 16"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="2" y="3" width="12" height="11" rx="2" />
+    <line x1="2" y1="7" x2="14" y2="7" />
+    <line x1="5" y1="1" x2="5" y2="4" />
+    <line x1="11" y1="1" x2="11" y2="4" />
+  </svg>
+);
+
 const fontLink =
   "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap";
+
+function formatDueDate(dateStr) {
+  if (!dateStr) return null;
+  const due = new Date(dateStr + "T00:00:00");
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+
+  let label = due.toLocaleDateString("ko-KR", {
+    month: "short",
+    day: "numeric",
+  });
+  let status = "normal";
+
+  if (diff < 0) {
+    label = `${label} (지남)`;
+    status = "overdue";
+  } else if (diff === 0) {
+    label = "오늘 마감";
+    status = "today";
+  } else if (diff === 1) {
+    label = "내일 마감";
+    status = "soon";
+  } else if (diff <= 3) {
+    label = `${label} (D-${diff})`;
+    status = "soon";
+  }
+
+  return { label, status };
+}
 
 export default function App() {
   const [todos, setTodos] = useState([]);
   const [input, setInput] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [removing, setRemoving] = useState(null);
   const [error, setError] = useState(null);
-  const [mounted, setMounted] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
-    setTimeout(() => setMounted(true), 100);
     api
       .getAll()
       .then((data) => {
@@ -97,9 +144,10 @@ export default function App() {
     const trimmed = input.trim();
     if (!trimmed) return;
     try {
-      const newTodo = await api.create(trimmed);
+      const newTodo = await api.create(trimmed, dueDate);
       setTodos((prev) => [newTodo, ...prev]);
       setInput("");
+      setDueDate("");
       inputRef.current?.focus();
     } catch (_err) {
       setError("추가 실패");
@@ -125,7 +173,7 @@ export default function App() {
         setError("삭제 실패");
       }
       setRemoving(null);
-    }, 400);
+    }, 350);
   };
 
   const filtered = todos.filter((t) => {
@@ -147,7 +195,6 @@ export default function App() {
     day: "numeric",
     weekday: "long",
   });
-
   const progressPercent = todos.length
     ? Math.round((counts.done / todos.length) * 100)
     : 0;
@@ -160,7 +207,7 @@ export default function App() {
 
         .todo-root {
           min-height: 100vh;
-          background: #050505;
+          background: #0a0a0a;
           color: #f0f0f0;
           font-family: 'Outfit', sans-serif;
           display: flex;
@@ -184,39 +231,25 @@ export default function App() {
         @keyframes grainShift {
           0%, 100% { transform: translate(0, 0); }
           10% { transform: translate(-2%, -3%); }
-          20% { transform: translate(3%, 1%); }
           30% { transform: translate(-1%, 4%); }
-          40% { transform: translate(4%, -2%); }
           50% { transform: translate(-3%, 3%); }
-          60% { transform: translate(2%, -4%); }
           70% { transform: translate(-4%, 1%); }
-          80% { transform: translate(1%, -1%); }
           90% { transform: translate(3%, 2%); }
-        }
-
-        .todo-root::after {
-          content: '';
-          position: fixed;
-          top: -20%; left: 50%;
-          transform: translateX(-50%);
-          width: 800px; height: 600px;
-          background: radial-gradient(ellipse, rgba(255,255,255,0.015) 0%, transparent 70%);
-          pointer-events: none;
-          z-index: 0;
         }
 
         .todo-container {
           width: 100%;
-          max-width: 520px;
+          max-width: 540px;
           position: relative;
           z-index: 1;
         }
 
+        /* ── Header ── */
         .todo-header {
-          margin-bottom: 52px;
+          margin-bottom: 40px;
           opacity: 0;
           transform: translateY(20px);
-          animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
+          animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
         }
 
         @keyframes fadeUp {
@@ -234,18 +267,19 @@ export default function App() {
           letter-spacing: 4px;
           text-transform: uppercase;
           color: #4a4a4a;
-          margin-bottom: 20px;
+          margin-bottom: 16px;
         }
 
         .todo-title-wrap {
           display: flex;
           align-items: baseline;
           gap: 4px;
+          margin-bottom: 16px;
         }
 
         .todo-title {
           font-weight: 900;
-          font-size: 64px;
+          font-size: 56px;
           line-height: 0.9;
           letter-spacing: -3px;
           color: #fff;
@@ -253,65 +287,33 @@ export default function App() {
 
         .todo-title-accent {
           display: inline-flex;
-          align-items: center;
-          justify-content: center;
           background: #fff;
           color: #050505;
           font-weight: 900;
-          font-size: 64px;
+          font-size: 56px;
           letter-spacing: -3px;
-          padding: 0 14px;
+          padding: 0 12px;
           line-height: 1.1;
           transform: rotate(-1.5deg);
           margin-left: 4px;
-          position: relative;
-        }
-
-        .todo-title-accent::after {
-          content: '';
-          position: absolute;
-          bottom: -4px;
-          left: 2px;
-          right: -2px;
-          height: 100%;
-          background: rgba(255,255,255,0.06);
-          transform: rotate(-1.5deg);
-          z-index: -1;
         }
 
         .todo-stats-row {
           display: flex;
           align-items: center;
-          gap: 16px;
-          margin-top: 20px;
-        }
-
-        .todo-stat-pill {
-          font-family: 'JetBrains Mono', monospace;
-          font-size: 11px;
-          font-weight: 500;
-          color: #666;
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.06);
-          padding: 6px 14px;
-          letter-spacing: 0.5px;
-        }
-
-        .todo-stat-pill strong {
-          color: #999;
-          font-weight: 600;
+          gap: 14px;
         }
 
         .progress-ring-wrap {
-          width: 40px;
-          height: 40px;
+          width: 38px;
+          height: 38px;
           position: relative;
         }
 
         .progress-ring {
           transform: rotate(-90deg);
-          width: 40px;
-          height: 40px;
+          width: 38px;
+          height: 38px;
         }
 
         .progress-ring-bg {
@@ -325,8 +327,8 @@ export default function App() {
           stroke: #fff;
           stroke-width: 3;
           stroke-linecap: round;
-          stroke-dasharray: 100.53;
-          stroke-dashoffset: 100.53;
+          stroke-dasharray: 94.25;
+          stroke-dashoffset: 94.25;
           transition: stroke-dashoffset 1s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
@@ -340,190 +342,227 @@ export default function App() {
           color: #888;
         }
 
-        .todo-error {
-          background: rgba(255, 60, 60, 0.06);
-          border: 1px solid rgba(255, 60, 60, 0.15);
-          color: #ff6b6b;
-          padding: 12px 16px;
-          font-size: 13px;
-          margin-bottom: 20px;
-          cursor: pointer;
+        .todo-stat-pill {
           font-family: 'JetBrains Mono', monospace;
-          transition: opacity 0.3s;
+          font-size: 11px;
+          font-weight: 500;
+          color: #666;
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.06);
+          padding: 5px 12px;
         }
 
-        .todo-error:hover { opacity: 0.8; }
+        .todo-stat-pill strong {
+          color: #999;
+        }
 
-        .todo-input-wrap {
-          margin-bottom: 36px;
+        /* ── White card panel ── */
+        .todo-panel {
+          background: #fff;
+          color: #111;
+          padding: 28px 24px 24px;
+          border-radius: 16px;
           opacity: 0;
           transform: translateY(16px);
-          animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards;
+          animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
         }
 
+        /* ── Input ── */
         .todo-input-row {
           display: flex;
-          border: 1px solid rgba(255,255,255,0.08);
-          background: rgba(255,255,255,0.02);
-          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+          border: 1.5px solid #e0e0e0;
+          border-radius: 10px;
           overflow: hidden;
+          transition: all 0.25s;
+          background: #fafafa;
         }
 
         .todo-input-row:focus-within {
-          border-color: rgba(255,255,255,0.25);
-          background: rgba(255,255,255,0.04);
-          box-shadow: 0 0 0 4px rgba(255,255,255,0.02);
+          border-color: #111;
+          box-shadow: 0 0 0 3px rgba(0,0,0,0.04);
+          background: #fff;
         }
 
         .todo-input {
           flex: 1;
           background: transparent;
           border: none;
-          color: #f0f0f0;
+          color: #111;
           font-family: 'Outfit', sans-serif;
           font-size: 14px;
           font-weight: 400;
-          padding: 18px 20px;
+          padding: 14px 16px;
           outline: none;
-          letter-spacing: 0.2px;
         }
 
         .todo-input::placeholder {
-          color: #363636;
+          color: #bbb;
           font-weight: 300;
         }
 
         .todo-add-btn {
-          background: #fff;
-          color: #050505;
+          background: #111;
+          color: #fff;
           border: none;
-          padding: 0 22px;
+          padding: 0 18px;
           cursor: pointer;
           display: flex;
           align-items: center;
-          justify-content: center;
-          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+          transition: all 0.15s;
+          border-radius: 0 8px 8px 0;
         }
 
-        .todo-add-btn:hover { background: #e8e8e8; }
-        .todo-add-btn:active { transform: scale(0.92); }
+        .todo-add-btn:hover { background: #333; }
+        .todo-add-btn:active { transform: scale(0.95); }
+
+        /* ── Date picker row ── */
+        .todo-options-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 10px;
+        }
+
+        .todo-date-input {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          background: #f5f5f5;
+          border: 1px solid #e8e8e8;
+          border-radius: 6px;
+          padding: 6px 10px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .todo-date-input:hover {
+          border-color: #ccc;
+          background: #f0f0f0;
+        }
+
+        .todo-date-input input {
+          background: transparent;
+          border: none;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 11px;
+          color: #555;
+          outline: none;
+          width: 110px;
+          cursor: pointer;
+        }
+
+        .todo-date-input input::-webkit-calendar-picker-indicator {
+          opacity: 0;
+          position: absolute;
+        }
+
+        .todo-date-input svg {
+          color: #888;
+          flex-shrink: 0;
+        }
 
         .todo-input-hint {
           font-family: 'JetBrains Mono', monospace;
           font-size: 10px;
-          color: #2a2a2a;
-          margin-top: 8px;
+          color: #ccc;
           letter-spacing: 0.5px;
+          margin-left: auto;
         }
 
         .todo-input-hint kbd {
-          display: inline-block;
-          background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.08);
-          padding: 1px 6px;
+          background: #f0f0f0;
+          border: 1px solid #e0e0e0;
+          padding: 1px 5px;
           font-family: 'JetBrains Mono', monospace;
           font-size: 9px;
-          color: #555;
-          margin: 0 2px;
+          color: #888;
+          border-radius: 3px;
         }
 
+        /* ── Filters ── */
         .todo-filters {
           display: flex;
-          gap: 6px;
-          margin-bottom: 28px;
-          opacity: 0;
-          animation: fadeIn 0.5s 0.6s forwards;
+          gap: 4px;
+          margin: 20px 0 16px;
         }
 
         .todo-filter-btn {
           background: transparent;
-          border: 1px solid transparent;
-          color: #444;
+          border: none;
+          color: #aaa;
           font-family: 'JetBrains Mono', monospace;
           font-size: 10px;
           font-weight: 500;
-          letter-spacing: 2px;
+          letter-spacing: 1.5px;
           text-transform: uppercase;
-          padding: 8px 14px;
+          padding: 6px 12px;
           cursor: pointer;
-          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-          position: relative;
+          transition: all 0.2s;
+          border-radius: 6px;
         }
 
-        .todo-filter-btn::after {
-          content: '';
-          position: absolute;
-          bottom: -1px;
-          left: 50%;
-          width: 0;
-          height: 1px;
-          background: #fff;
-          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-          transform: translateX(-50%);
+        .todo-filter-btn:hover { color: #666; background: #f5f5f5; }
+
+        .todo-filter-btn.active {
+          color: #111;
+          background: #f0f0f0;
         }
-
-        .todo-filter-btn:hover { color: #888; }
-
-        .todo-filter-btn.active { color: #fff; }
-
-        .todo-filter-btn.active::after { width: 100%; }
 
         .todo-filter-count {
-          display: inline-block;
           font-size: 9px;
-          padding: 2px 6px;
-          margin-left: 5px;
-          background: rgba(255,255,255,0.04);
-          color: #555;
-          transition: all 0.25s;
+          padding: 1px 5px;
+          margin-left: 4px;
+          background: #e8e8e8;
+          color: #888;
+          border-radius: 3px;
+          transition: all 0.2s;
         }
 
         .todo-filter-btn.active .todo-filter-count {
-          background: #fff;
-          color: #050505;
+          background: #111;
+          color: #fff;
         }
 
+        /* ── Divider ── */
         .todo-divider {
           height: 1px;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06) 20%, rgba(255,255,255,0.06) 80%, transparent);
-          margin-bottom: 8px;
+          background: #f0f0f0;
+          margin-bottom: 4px;
         }
 
+        /* ── List ── */
         .todo-list { list-style: none; }
 
         .todo-item {
           display: flex;
-          align-items: center;
-          gap: 14px;
-          padding: 16px 18px;
-          margin-bottom: 4px;
-          background: rgba(255,255,255,0.015);
-          border: 1px solid rgba(255,255,255,0.03);
-          transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+          align-items: flex-start;
+          gap: 12px;
+          padding: 14px 12px;
+          margin-bottom: 2px;
+          border-radius: 10px;
+          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
           opacity: 0;
-          transform: translateY(12px) scale(0.98);
-          animation: itemIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          transform: translateY(10px);
+          animation: itemIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
 
-        .todo-item:hover {
-          background: rgba(255,255,255,0.03);
-          border-color: rgba(255,255,255,0.06);
-        }
+        .todo-item:hover { background: #f8f8f8; }
 
         .todo-item.removing {
           opacity: 0;
-          transform: translateX(60px) scale(0.95);
-          transition: all 0.4s cubic-bezier(0.55, 0, 1, 0.45);
+          transform: translateX(50px) scale(0.95);
+          transition: all 0.35s cubic-bezier(0.55, 0, 1, 0.45);
         }
 
         @keyframes itemIn {
-          to { opacity: 1; transform: translateY(0) scale(1); }
+          to { opacity: 1; transform: translateY(0); }
         }
 
+        /* ── Checkbox ── */
         .todo-checkbox {
           width: 20px;
           height: 20px;
-          border: 1.5px solid #333;
+          border: 2px solid #d0d0d0;
           border-radius: 50%;
           background: transparent;
           cursor: pointer;
@@ -533,23 +572,23 @@ export default function App() {
           flex-shrink: 0;
           transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           padding: 0;
+          margin-top: 2px;
         }
 
         .todo-checkbox:hover {
-          border-color: #666;
+          border-color: #999;
           transform: scale(1.1);
         }
 
         .todo-checkbox.checked {
-          background: #fff;
-          border-color: #fff;
-          color: #050505;
-          transform: scale(1);
+          background: #111;
+          border-color: #111;
+          color: #fff;
         }
 
         .todo-checkbox.checked:hover {
           transform: scale(1.1);
-          box-shadow: 0 0 12px rgba(255,255,255,0.15);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
 
         .todo-checkbox svg {
@@ -563,59 +602,77 @@ export default function App() {
           transform: scale(1) rotate(0deg);
         }
 
-        .todo-text {
+        /* ── Todo content ── */
+        .todo-content {
           flex: 1;
+          min-width: 0;
+        }
+
+        .todo-text {
           font-size: 14px;
           font-weight: 400;
-          color: #d0d0d0;
-          transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+          color: #222;
           line-height: 1.5;
-          letter-spacing: 0.1px;
+          transition: all 0.3s;
         }
 
         .todo-text.done {
-          color: #333;
+          color: #bbb;
           text-decoration: line-through;
-          text-decoration-color: #2a2a2a;
-          text-decoration-thickness: 1px;
+          text-decoration-color: #ddd;
         }
 
+        .todo-due {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 10px;
+          font-weight: 500;
+          margin-top: 4px;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 2px 8px;
+          border-radius: 4px;
+          letter-spacing: 0.3px;
+        }
+
+        .todo-due.normal { background: #f0f0f0; color: #888; }
+        .todo-due.soon { background: #fff3e0; color: #e65100; }
+        .todo-due.today { background: #fff3e0; color: #e65100; font-weight: 600; }
+        .todo-due.overdue { background: #fce4ec; color: #c62828; }
+        .todo-due.done-date { background: #f5f5f5; color: #ccc; text-decoration: line-through; }
+
+        /* ── Delete — always visible ── */
         .todo-delete {
           background: transparent;
           border: none;
-          color: #222;
+          color: #ccc;
           cursor: pointer;
-          padding: 8px;
-          border-radius: 50%;
+          padding: 6px;
+          border-radius: 6px;
           display: flex;
           align-items: center;
-          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-          opacity: 0;
-          transform: scale(0.8);
-        }
-
-        .todo-item:hover .todo-delete {
-          opacity: 1;
-          transform: scale(1);
+          transition: all 0.2s;
+          margin-top: 1px;
+          flex-shrink: 0;
         }
 
         .todo-delete:hover {
-          color: #ff4444;
-          background: rgba(255, 68, 68, 0.08);
-          transform: scale(1.15);
+          color: #e53935;
+          background: #fce4ec;
         }
 
+        /* ── Empty ── */
         .todo-empty {
           text-align: center;
-          padding: 72px 0;
-          color: #252525;
+          padding: 56px 0;
         }
 
         .todo-empty-box {
-          width: 48px;
-          height: 48px;
-          border: 1.5px solid #1a1a1a;
-          margin: 0 auto 20px;
+          width: 44px;
+          height: 44px;
+          border: 1.5px solid #e0e0e0;
+          border-radius: 10px;
+          margin: 0 auto 16px;
           animation: emptyFloat 3s ease-in-out infinite;
         }
 
@@ -627,79 +684,62 @@ export default function App() {
         .todo-empty-text {
           font-size: 13px;
           font-weight: 300;
-          letter-spacing: 0.5px;
-          color: #333;
+          color: #bbb;
         }
 
-        .todo-footer {
-          margin-top: 40px;
-          padding-top: 24px;
-          border-top: 1px solid rgba(255,255,255,0.04);
+        /* ── Footer ── */
+        .todo-panel-footer {
+          margin-top: 20px;
+          padding-top: 16px;
+          border-top: 1px solid #f0f0f0;
           display: flex;
           justify-content: space-between;
           align-items: center;
-          opacity: 0;
-          animation: fadeIn 0.5s 0.8s forwards;
         }
 
-        .todo-footer-stat {
+        .footer-stat {
           font-family: 'JetBrains Mono', monospace;
           font-size: 10px;
-          color: #333;
-          letter-spacing: 1px;
+          color: #bbb;
+          letter-spacing: 0.5px;
         }
 
-        .todo-footer-stat strong {
-          color: #666;
-          font-weight: 600;
-        }
+        .footer-stat strong { color: #888; }
 
         .progress-bar-wrap {
           flex: 1;
-          max-width: 180px;
-          margin: 0 20px;
+          max-width: 160px;
+          margin: 0 16px;
         }
 
         .progress-bar {
-          height: 2px;
-          background: rgba(255,255,255,0.04);
+          height: 3px;
+          background: #f0f0f0;
+          border-radius: 2px;
           overflow: hidden;
         }
 
         .progress-bar-fill {
           height: 100%;
-          background: #fff;
+          background: #111;
+          border-radius: 2px;
           transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-          position: relative;
         }
 
-        .progress-bar-fill::after {
-          content: '';
-          position: absolute;
-          right: 0;
-          top: -2px;
-          width: 6px;
-          height: 6px;
-          background: #fff;
-          border-radius: 50%;
-          opacity: 0;
-          transition: opacity 0.3s;
-        }
-
-        .progress-bar-fill.active::after { opacity: 1; }
-
+        /* ── Loading ── */
         .todo-loading {
           display: flex;
           justify-content: center;
           align-items: center;
-          gap: 6px;
-          padding: 72px 0;
+          gap: 5px;
+          padding: 64px 0;
         }
 
         .todo-loading-bar {
           width: 3px;
-          height: 20px;
-          background: #fff;
+          height: 18px;
+          background: #ddd;
+          border-radius: 2px;
           animation: loadPulse 1.2s ease-in-out infinite;
         }
 
@@ -713,6 +753,7 @@ export default function App() {
           50% { transform: scaleY(1); opacity: 1; }
         }
 
+        /* ── Corner accents ── */
         .corner {
           position: fixed;
           pointer-events: none;
@@ -733,30 +774,21 @@ export default function App() {
           border-right: 1px solid rgba(255,255,255,0.04);
         }
 
-        .corner-dot {
-          position: fixed;
-          width: 3px; height: 3px;
-          background: rgba(255,255,255,0.08);
-          border-radius: 50%;
-          pointer-events: none;
-          z-index: 0;
-        }
-
+        /* ── Responsive ── */
         @media (max-width: 600px) {
-          .todo-title, .todo-title-accent { font-size: 44px; letter-spacing: -2px; }
+          .todo-title, .todo-title-accent { font-size: 40px; letter-spacing: -2px; }
           .todo-root { padding: 28px 16px 60px; }
-          .todo-delete { opacity: 1; transform: scale(1); }
-          .todo-item { padding: 14px 14px; }
+          .todo-panel { padding: 20px 16px 16px; }
+          .todo-item { padding: 12px 8px; }
         }
       `}</style>
 
-      <div className={`todo-root ${mounted ? "mounted" : ""}`}>
+      <div className="todo-root">
         <div className="corner corner-tl" />
         <div className="corner corner-br" />
-        <div className="corner-dot" style={{ top: 24, left: 24 }} />
-        <div className="corner-dot" style={{ bottom: 24, right: 24 }} />
 
         <div className="todo-container">
+          {/* Header — dark area */}
           <header className="todo-header">
             <p className="todo-date">{dateStr}</p>
             <div className="todo-title-wrap">
@@ -765,16 +797,15 @@ export default function App() {
             </div>
             <div className="todo-stats-row">
               <div className="progress-ring-wrap">
-                <svg className="progress-ring" viewBox="0 0 40 40">
-                  <circle className="progress-ring-bg" cx="20" cy="20" r="16" />
+                <svg className="progress-ring" viewBox="0 0 38 38">
+                  <circle className="progress-ring-bg" cx="19" cy="19" r="15" />
                   <circle
                     className="progress-ring-fill"
-                    cx="20"
-                    cy="20"
-                    r="16"
+                    cx="19"
+                    cy="19"
+                    r="15"
                     style={{
-                      strokeDashoffset:
-                        100.53 - (100.53 * progressPercent) / 100,
+                      strokeDashoffset: 94.25 - (94.25 * progressPercent) / 100,
                     }}
                   />
                 </svg>
@@ -787,12 +818,26 @@ export default function App() {
           </header>
 
           {error && (
-            <div className="todo-error" onClick={() => setError(null)}>
+            <div
+              style={{
+                background: "rgba(255,60,60,0.08)",
+                border: "1px solid rgba(255,60,60,0.15)",
+                color: "#ff6b6b",
+                padding: "10px 14px",
+                fontSize: 13,
+                marginBottom: 16,
+                cursor: "pointer",
+                fontFamily: "'JetBrains Mono', monospace",
+              }}
+              onClick={() => setError(null)}
+            >
               {error}
             </div>
           )}
 
-          <div className="todo-input-wrap">
+          {/* White card panel */}
+          <div className="todo-panel">
+            {/* Input */}
             <div className="todo-input-row">
               <input
                 ref={inputRef}
@@ -807,90 +852,120 @@ export default function App() {
                 <PlusIcon />
               </button>
             </div>
-            <p className="todo-input-hint">
-              <kbd>Enter</kbd> 눌러서 추가
-            </p>
-          </div>
 
-          <div className="todo-filters">
-            {["all", "active", "done"].map((f) => (
-              <button
-                key={f}
-                className={`todo-filter-btn ${filter === f ? "active" : ""}`}
-                onClick={() => setFilter(f)}
-              >
-                {f === "all" ? "전체" : f === "active" ? "진행중" : "완료"}
-                <span className="todo-filter-count">{counts[f]}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="todo-divider" />
-
-          {loading ? (
-            <div className="todo-loading">
-              <div className="todo-loading-bar" />
-              <div className="todo-loading-bar" />
-              <div className="todo-loading-bar" />
-              <div className="todo-loading-bar" />
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="todo-empty">
-              <div className="todo-empty-box" />
-              <p className="todo-empty-text">
-                {filter === "all"
-                  ? "할 일을 추가해보세요"
-                  : filter === "active"
-                    ? "모든 할 일을 완료했습니다"
-                    : "아직 완료한 항목이 없습니다"}
-              </p>
-            </div>
-          ) : (
-            <ul className="todo-list">
-              {filtered.map((todo, i) => (
-                <li
-                  key={todo._id}
-                  className={`todo-item ${removing === todo._id ? "removing" : ""}`}
-                  style={{ animationDelay: `${i * 0.06}s` }}
-                >
-                  <button
-                    className={`todo-checkbox ${todo.completed ? "checked" : ""}`}
-                    onClick={() => toggleTodo(todo._id, todo.completed)}
-                  >
-                    <CheckIcon />
-                  </button>
-                  <span className={`todo-text ${todo.completed ? "done" : ""}`}>
-                    {todo.title}
-                  </span>
-                  <button
-                    className="todo-delete"
-                    onClick={() => removeTodo(todo._id)}
-                  >
-                    <TrashIcon />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {todos.length > 0 && (
-            <div className="todo-footer">
-              <span className="todo-footer-stat">
-                <strong>{counts.active}</strong> remaining
-              </span>
-              <div className="progress-bar-wrap">
-                <div className="progress-bar">
-                  <div
-                    className={`progress-bar-fill ${progressPercent > 0 && progressPercent < 100 ? "active" : ""}`}
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
+            <div className="todo-options-row">
+              <div className="todo-date-input">
+                <CalendarIcon />
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  placeholder="마감일"
+                />
               </div>
-              <span className="todo-footer-stat">
-                <strong>{progressPercent}%</strong> done
+              <span className="todo-input-hint">
+                <kbd>Enter</kbd> 추가
               </span>
             </div>
-          )}
+
+            {/* Filters */}
+            <div className="todo-filters">
+              {["all", "active", "done"].map((f) => (
+                <button
+                  key={f}
+                  className={`todo-filter-btn ${filter === f ? "active" : ""}`}
+                  onClick={() => setFilter(f)}
+                >
+                  {f === "all" ? "전체" : f === "active" ? "진행중" : "완료"}
+                  <span className="todo-filter-count">{counts[f]}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="todo-divider" />
+
+            {/* List */}
+            {loading ? (
+              <div className="todo-loading">
+                <div className="todo-loading-bar" />
+                <div className="todo-loading-bar" />
+                <div className="todo-loading-bar" />
+                <div className="todo-loading-bar" />
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="todo-empty">
+                <div className="todo-empty-box" />
+                <p className="todo-empty-text">
+                  {filter === "all"
+                    ? "할 일을 추가해보세요"
+                    : filter === "active"
+                      ? "모든 할 일을 완료했습니다"
+                      : "아직 완료한 항목이 없습니다"}
+                </p>
+              </div>
+            ) : (
+              <ul className="todo-list">
+                {filtered.map((todo, i) => {
+                  const due = formatDueDate(todo.dueDate);
+                  return (
+                    <li
+                      key={todo._id}
+                      className={`todo-item ${removing === todo._id ? "removing" : ""}`}
+                      style={{ animationDelay: `${i * 0.05}s` }}
+                    >
+                      <button
+                        className={`todo-checkbox ${todo.completed ? "checked" : ""}`}
+                        onClick={() => toggleTodo(todo._id, todo.completed)}
+                      >
+                        <CheckIcon />
+                      </button>
+                      <div className="todo-content">
+                        <span
+                          className={`todo-text ${todo.completed ? "done" : ""}`}
+                        >
+                          {todo.title}
+                        </span>
+                        {due && (
+                          <div
+                            className={`todo-due ${todo.completed ? "done-date" : due.status}`}
+                          >
+                            <CalendarIcon />
+                            {due.label}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        className="todo-delete"
+                        onClick={() => removeTodo(todo._id)}
+                      >
+                        <TrashIcon />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+
+            {/* Footer */}
+            {todos.length > 0 && (
+              <div className="todo-panel-footer">
+                <span className="footer-stat">
+                  <strong>{counts.active}</strong> remaining
+                </span>
+                <div className="progress-bar-wrap">
+                  <div className="progress-bar">
+                    <div
+                      className="progress-bar-fill"
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                </div>
+                <span className="footer-stat">
+                  <strong>{progressPercent}%</strong> done
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </>
