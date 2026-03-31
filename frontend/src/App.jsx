@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
-const API_BASE = "https://to-do-list-beta-ruby-82.vercel.app/api/todos";
+const API_BASE = "https://todo-app-mini-project-20223152.vercel.app/api/todos";
 
 const api = {
   async getAll() {
