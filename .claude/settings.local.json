@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find C:/Users/shsmt/Desktop/SC/todo-app -type f -name *.html -o -name .env* -o -name vite.config.*)"
+    ]
+  }
+}
